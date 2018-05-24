@@ -118,6 +118,17 @@ function random(len) {
   return num;
 }
 
+/**
+ * 处理批量手机号码
+ */
+function dryMobiles(mobile) {
+  let mobiles = mobile.split(',');
+  let dry_mobs = mobiles.map( (m) => {
+    return m.trim();
+  });
+  return dry_mobs;
+}
+
 // -- routers ------------------------------------------------------
 app.get('/', function (req, res, next) {
   setTimeout(() => res.end('Hello Fire Alarm!'), Math.random() * 500);
@@ -312,6 +323,7 @@ app.post('/fire/alarm', function (req, res, next) {
   if( !mobile) {
     return res.sendStatus(500);
   }
+  let dry_mobs = dryMobiles(mobile);
   
   // 收集整理数据
   let store = req.body.store || '默认1店';
@@ -346,13 +358,6 @@ app.post('/fire/alarm', function (req, res, next) {
   };
   alarm.type = 'fire_alarm';
   
-  // 处理批量手机号码
-  //mobile = '13011112222';
-  let mobiles = mobile.split(',');
-  let dry_mobs = mobiles.map( (m) => {
-    return m.trim();
-  });
-  
   // 查询并发送报警
   db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
     //console.log('users:', err, users);
@@ -378,7 +383,7 @@ app.get('/test', function (req, res) {
   let time = new Date().toLocaleString();
   
   let alarm = {};
-  alarm.templateId = wx.tmpIdFireAlarm;;
+  alarm.templateId = wx.tmpIdFireAlarm;
   alarm.url = WX_MSG_URL;
   alarm.data = {
     "first":{
@@ -406,6 +411,87 @@ app.get('/test', function (req, res) {
   
   sendAlarm(alarm, users);
   res.send('test');
+});
+
+/**
+ * KPI 报警对外 API 接口
+ */
+app.post('/kpi/alarm', function (req, res, next) {
+  let token = (req.body.token || '').trim();
+  let mobile = (req.body.mobile || '').trim();
+  console.log('Recv mobiles:', mobile);
+    
+  // 验证 token 正确
+  if( token != '20185523') {
+    return res.sendStatus(401);
+  }
+  
+  if( !mobile) {
+    return res.sendStatus(500);
+  }
+  let dry_mobs = dryMobiles(mobile);
+  
+  // 收集整理数据
+  let firstline = req.body.firstline || '默认设备 温度超标！数值:15 标准:0-10';
+  let level_name = req.body.level_name || '报警';
+  let level_color = req.body.level_color || '#16A765';
+  let curtime = req.body.curtime || new Date().toLocaleString();
+  let location = req.body.location || '默认库房';
+  let contact = req.body.contact || '默认联系人';
+  let workorder = req.body.workorder || 'n/a';
+  let lastline = req.body.lastline || '已持续x分钟, 请及时处理！';
+  
+  let alarm = {};
+  alarm.templateId = wx.tmpIdKpiAlarm;
+  alarm.url = WX_MSG_URL;
+  alarm.data = {
+    "first": {
+      "value": firstline, 
+      "color":"#173177"
+    },
+    "keyword1":{
+      "value": level_name,
+      "color": level_color
+    },
+    "keyword2": {
+      "value": curtime,
+      "color":"#173177"
+    },
+    "keyword3": {
+      "value": location,
+      "color":"#173177"
+    },
+    "keyword4": {
+    "value": contact,
+    "color":"#173177"
+    },
+    "keyword5": {
+    "value": workorder,
+    "color":"#173177"
+    },
+    "remark":{
+    "value": lastline,
+    "color":"#173177"
+    }
+  };
+  alarm.type = 'kpi_alarm';
+  
+  // 查询并发送报警
+  db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
+    //console.log('users:', err, users);
+    if(err)  return next(err);
+    
+    sendAlarm(alarm, users);
+    let to_mobiles = users.map(function(u) {
+      return u.mobile;
+    });
+    
+    res.send({
+      err: 0,
+      msg: 'success',
+      to_mobiles,
+    });
+  });
 });
 
 // catch 404 and forward to error handler
