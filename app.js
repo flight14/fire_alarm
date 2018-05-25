@@ -96,8 +96,9 @@ var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
  * 发送报警 
  */
 function sendAlarm(alarm, users) {
-  let curtime = new Date().toLocaleString();
-  console.error('SendAlarm', curtime, alarm.type, '--------------------');
+  let curtime = new Date().toLocaleTimeString();
+  let rectime = alarm.rtime.toLocaleString();
+  console.error('SendAlarm r', rectime, 's', curtime, alarm.type, '----------------');
   
   users.forEach( function(user) {
     if(!user.openid)  return;
@@ -324,7 +325,8 @@ app.post('/sendsms', function (req, res, next) {
 app.post('/fire/alarm', function (req, res, next) {
   let token = (req.body.token || '').trim();
   let mobile = (req.body.mobile || '').trim();
-  console.log('Recv mobiles:', mobile);
+  let rtime = new Date();
+  console.log('RecvMobile', rtime.toLocaleString(), mobile);
     
   // 验证 token 正确
   if( token != '20180516') {
@@ -368,14 +370,15 @@ app.post('/fire/alarm', function (req, res, next) {
     }
   };
   alarm.type = 'fire_alarm';
+  alarm.rtime = rtime;
   
   // 查询并发送报警
   db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
     //console.log('users:', err, users);
     if(err) return	next(err);
     
-    let t = {alarm, users};
-    alarm_tasks.unshift(t);
+    let task = {alarm, users};
+    alarm_tasks.unshift(task);
     
     let to_mobiles = users.map(function(u) {
       return u.mobile;
@@ -421,6 +424,7 @@ app.get('/test', function (req, res) {
     }
   };
   alarm.type = 'fire_alarm';
+  alarm.rtime = new Date();
   
   sendAlarm(alarm, users);
   res.send('test');
@@ -432,7 +436,8 @@ app.get('/test', function (req, res) {
 app.post('/kpi/alarm', function (req, res, next) {
   let token = (req.body.token || '').trim();
   let mobile = (req.body.mobile || '').trim();
-  console.log('Recv mobiles:', mobile);
+  let rtime = new Date();
+  console.log('RecvMobile', rtime.toLocaleString(), mobile);
     
   // 验证 token 正确
   if( token != '20185523') {
@@ -488,14 +493,15 @@ app.post('/kpi/alarm', function (req, res, next) {
     }
   };
   alarm.type = 'kpi_alarm';
+  alarm.rtime = rtime;
   
   // 查询并发送报警
   db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
     //console.log('users:', err, users);
     if(err)  return next(err);
     
-    let t = {alarm, users};
-    alarm_tasks.unshift(t);
+    let task = {alarm, users};
+    alarm_tasks.unshift(task);
     
     let to_mobiles = users.map(function(u) {
       return u.mobile;
