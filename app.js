@@ -37,6 +37,7 @@ http.createServer(app).listen(3119, function () {
 const WX_MSG_URL = 'http://weixin.qq.com';
 const MAX_SMS_COUNT = 10;
 var users = require('./users');
+var alarm_tasks = [];
 
 // ALI smsClient
 const ali = require('./aliconfig');
@@ -53,6 +54,16 @@ var j = schedule.scheduleJob('5 2 * * *', function(){
     console.log('DelExpire', err, results);
   });
 });
+
+/**
+ * 从队列发送
+ */
+setInterval(function() {
+  let t = alarm_tasks.pop();
+  if( t) {
+    sendAlarm(t.alarm, t.users);
+  }
+}, 1000);
 
 /**
  * 微信 API 初始化
@@ -363,7 +374,9 @@ app.post('/fire/alarm', function (req, res, next) {
     //console.log('users:', err, users);
     if(err) return	next(err);
     
-    sendAlarm(alarm, users);
+    let t = {alarm, users};
+    alarm_tasks.unshift(t);
+    
     let to_mobiles = users.map(function(u) {
       return u.mobile;
     });
@@ -462,16 +475,16 @@ app.post('/kpi/alarm', function (req, res, next) {
       "color":"#173177"
     },
     "keyword4": {
-    "value": contact,
-    "color":"#173177"
+      "value": contact,
+      "color":"#173177"
     },
     "keyword5": {
-    "value": workorder,
-    "color":"#173177"
+      "value": workorder,
+      "color":"#173177"
     },
     "remark":{
-    "value": lastline,
-    "color":"#173177"
+      "value": lastline,
+      "color":"#173177"
     }
   };
   alarm.type = 'kpi_alarm';
@@ -481,7 +494,9 @@ app.post('/kpi/alarm', function (req, res, next) {
     //console.log('users:', err, users);
     if(err)  return next(err);
     
-    sendAlarm(alarm, users);
+    let t = {alarm, users};
+    alarm_tasks.unshift(t);
+    
     let to_mobiles = users.map(function(u) {
       return u.mobile;
     });
