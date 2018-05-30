@@ -314,7 +314,7 @@ app.post('/sendsms', function (req, res, next) {
       return 'SMS Failed! Should be caught below';
     }
   }).then( result => {
-    //console.log('captchaSql.upsert:', result);
+    console.log('captchaSql.upsert:', result);
   }).catch( err => {
     if( err.data) {
       // SMS error
@@ -388,10 +388,7 @@ app.post('/fire/alarm', function (req, res, next) {
   alarm.rtime = rtime;
   
   // 查询并发送报警
-  db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
-    //console.log('users:', err, users);
-    if(err) return	next(err);
-    
+  db.query(fireUsers.getUsersByMobile, [dry_mobs]).then( users => {
     let task = {alarm, users};
     alarm_tasks.unshift(task);
     
@@ -404,7 +401,10 @@ app.post('/fire/alarm', function (req, res, next) {
       msg: 'success',
       to_mobiles,
     });
+  }).catch( err => {
+    return next(err);
   });
+  
 });
 
 app.get('/test', function (req, res) {
@@ -515,10 +515,7 @@ app.post('/kpi/alarm', function (req, res, next) {
   alarm.rtime = rtime;
   
   // 查询并发送报警
-  db.query(fireUsers.getUsersByMobile, [dry_mobs], function (err, users) {
-    //console.log('users:', err, users);
-    if(err)  return next(err);
-    
+  db.query(fireUsers.getUsersByMobile, [dry_mobs]).then( users => {
     let task = {alarm, users};
     alarm_tasks.unshift(task);
     
@@ -531,6 +528,8 @@ app.post('/kpi/alarm', function (req, res, next) {
       msg: 'success',
       to_mobiles,
     });
+  }).catch( err => {
+    return next(err);
   });
 });
 
