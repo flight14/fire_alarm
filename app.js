@@ -282,43 +282,50 @@ app.post('/sendsms', function (req, res, next) {
   if(!validMobile(mobile)) {
     return res.json({err:101, msg:'手机号码格式错误'});
   }
+  let expire, captcha, count;
   
-  db.query(captchaSql.getByMobile, [mobile], function (err, results) {
-    //console.log('results', err, results);
-    if(err) return next(err);
-    
+  db.query(captchaSql.getByMobile, [mobile]).then( results => {
     // 限制条数
-    let expire = parseInt(new Date().getTime()/1000) + 5*60;
-    let captcha = random(4); //'1234'
-    let count = (!results.length)? 0: results[0].count;
+    expire = parseInt(new Date().getTime()/1000) + 5*60;
+    captcha = random(4); //'1234'
+    count = (!results.length)? 0: results[0].count;
     console.log('sms', mobile, 'count', count);
     if( ++count > MAX_SMS_COUNT) {
       return res.json({err:102, msg:'短消息发送次数过多'});
     }
     
     // 短信发送
-    smsClient.sendSMS({
+    return smsClient.sendSMS({
       PhoneNumbers: mobile,
       SignName: '倍省提醒',
       TemplateCode: 'SMS_135026027',
       TemplateParam: '{"code":"'+ captcha +'"}'
-    }).then(function (result) {
-      //console.log('sendSMS res:', result);
-      let {Code}=result;
-      if (Code === 'OK') {
-        res.json({err:0, msg:'ok'});
-      }
+    })
+  }).then( result => {
+    //console.log('SMS result:', result);
+    let {Code}=result;
+    if (Code === 'OK') {
+      res.json({err:0, msg:'ok'});
       
       // 插入更新db
-      db.query(captchaSql.upsert, [mobile,captcha,expire,captcha,expire,count], function (err, results) {
-        //console.log('results', err, results);
-        if(err) return next(err);
-      });
-    }).catch(function (err) {
-      console.log('sendSMS err:', err);
+      return db.query(captchaSql.upsert, [mobile,captcha,expire,captcha,expire,count]);
+    }
+    else {
+      return 'SMS Failed! Should be caught below';
+    }
+  }).then( result => {
+    //console.log('captchaSql.upsert:', result);
+  }).catch( err => {
+    if( err.data) {
+      // SMS error
+      console.log('SMS error:', err);
       res.json({err:err.data.Code, msg:err.data.Message});
-    });
-
+    }
+    else {
+      // DB error(maybe)
+      console.log('DB error:', err);
+      res.json({err:199, msg:'DB发生未知错误'});
+    }
   });
   
 });
