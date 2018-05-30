@@ -349,23 +349,27 @@ app.post('/fire/alarm', function (req, res, next) {
   alarm.url = WX_MSG_URL;
   alarm.data = {
     "first":{
-    "value": '你好, 报警时间 '+ time,
+    "value": '你好, 请注意:',
     "color": "#173177"
     },
     "keyword1":{
+    "value": time,
+    "color": "#173177"
+    },
+    "keyword2":{
     "value": store,
     "color": "#173177"
     },
-    "keyword2": {
+    "keyword3": {
     "value": device,
     "color": "#173177"
     },
-    "keyword3": {
+    "keyword4": {
     "value": status,
     "color":"#173177"
     },
     "remark":{
-    "value": '请关注！',
+    "value": '请及时处理！',
     "color":"#173177"
     }
   };
@@ -403,23 +407,27 @@ app.get('/test', function (req, res) {
   alarm.url = WX_MSG_URL;
   alarm.data = {
     "first":{
-    "value": '你好, 报警时间 '+ time,
+    "value": '你好, 请注意:',
     "color": "#173177"
     },
     "keyword1":{
+    "value": time,
+    "color": "#173177"
+    },
+    "keyword2":{
     "value": store,
     "color": "#173177"
     },
-    "keyword2": {
+    "keyword3": {
     "value": device,
     "color": "#173177"
     },
-    "keyword3": {
+    "keyword4": {
     "value": status,
     "color":"#173177"
     },
     "remark":{
-    "value": '请关注！',
+    "value": '请及时处理！',
     "color":"#173177"
     }
   };
