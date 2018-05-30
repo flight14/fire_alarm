@@ -169,7 +169,11 @@ app.get('/fire/bind', function (req, res, next) {
   getAccessTokenPro(code).then( result => {
     // console.log('getAccessToken', result);
     openid = result.data.openid;
-    if(!openid)  return res.status(401).send('微信id获取错误！');
+    if(!openid) {
+      let err = new Error('微信id获取错误！');
+      err.status = 401;
+      throw err;
+    }
     
     // 查询用户绑定
     return db.query(fireUsers.getUserByOpenid, [openid]);
@@ -205,64 +209,68 @@ app.post('/fire/bind', function (req, res, next) {
     return res.redirect('/result?ok=0&err='+error);
   }
   
-  // VALID captcha
-  db.query(captchaSql.getByMobile, [mobile], function (err, results) {
-    // console.log('results', err, results);
-    if(err) return next(err);    
+  db.query(captchaSql.getByMobile, [mobile]).then( results => {
+    // VALID captcha
     if(!results.length || results[0].captcha != captcha) {
-      let error = '验证码无效';
-      return res.redirect('/result?ok=0&err='+error);
+      let err = new Error('MyErr');
+      err.MyErr = '验证码无效';
+      throw err;
     }
     
     let is_expire = (new Date(results[0].expire*1000)) < (new Date());
     if( is_expire) {
-      let error = '验证码过期';
-      return res.redirect('/result?ok=0&err='+error);
+      let err = new Error('MyErr');
+      err.MyErr = '验证码过期';
+      throw err;
     }
     
     // Bind or Unbind
+    let next_step;
     if(tobind) {
-      db.query(fireUsers.getUserByMobile, [mobile], function (err, results) {
-        //console.log('results', err, results);
-        if(err) return next(err);
-        if(results.length > 0) {
-          let error = '该手机号已被绑定过';
-          res.redirect('/result?ok=0&err='+error);
+      next_step = db.query(fireUsers.getUserByMobile, [mobile]).then( results => {
+        if( results.length > 0) {
+          let err = new Error('MyErr');
+          err.MyErr = '该手机号已被绑定过';
+          throw err;
+        }
+        return db.query(fireUsers.create, [mobile, openid]);
+      }).then( okPacket =>  {
+        //console.log('okPacket', okPacket);
+        if( okPacket.affectedRows == 1) {
+          console.log('Bind mobile: '+ mobile);
+          res.redirect('/result?ok=1');
         }
         else {
-          db.query(fireUsers.create, [mobile, openid], function (err, okPacket) {
-            //console.log('okPacket', err, okPacket);
-            if(err) return next(err);
-            if( okPacket.affectedRows == 1) {
-              console.log('Bind mobile: '+ mobile);
-              res.redirect('/result?ok=1');
-            }
-            else {
-              let error = '数据库插入错误';
-              res.redirect('/result?ok=0&err='+error);
-            }
-          });
+          let err = new Error('MyErr');
+          err.MyErr = '数据库插入错误!';
+          throw err;
         }
       });
     }
     else {
-      db.query(fireUsers.delUserByMobile, [mobile], function (err, okPacket) {
-        //console.log('okPacket', err, okPacket);
-        if(err) return next(err);
+      next_step = db.query(fireUsers.delUserByMobile, [mobile]).then( okPacket => {
+        //console.log('okPacket', okPacket);
         if( okPacket.affectedRows == 1) {
           console.log('Unbind mobile: '+ mobile);
           res.redirect('/result?ok=1');
         }
         else {
-          let error = '数据库删除错误';
-          res.redirect('/result?ok=0&err='+error);
+          let err = new Error('MyErr');
+          err.MyErr = '数据库删除错误!';
+          throw err;
         }
       });
     }
-    
+    return next_step;
+  }).catch( err => {
+    if( err.MyErr) {
+      return res.redirect('/result?ok=0&err='+err.MyErr);
+    }
+    else {
+      return next(err);
+    }
   });
   
-  return;
 });
 
 /**
@@ -291,7 +299,9 @@ app.post('/sendsms', function (req, res, next) {
     count = (!results.length)? 0: results[0].count;
     console.log('sms', mobile, 'count', count);
     if( ++count > MAX_SMS_COUNT) {
-      return res.json({err:102, msg:'短消息发送次数过多'});
+      let err = new Error('MyErr');
+      err.MyErr = {err:102, msg:'短消息发送次数过多'};
+      throw err;
     }
     
     // 短信发送
@@ -314,9 +324,14 @@ app.post('/sendsms', function (req, res, next) {
       return 'SMS Failed! Should be caught below';
     }
   }).then( result => {
-    console.log('captchaSql.upsert:', result);
+    //console.log('captchaSql.upsert:', result);
   }).catch( err => {
-    if( err.data) {
+    if( err.MyErr) {
+      // MY error
+      console.log('MY error:', err);
+      res.json(err.MyErr);
+    }
+    else if( err.data) {
       // SMS error
       console.log('SMS error:', err);
       res.json({err:err.data.Code, msg:err.data.Message});
