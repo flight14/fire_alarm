@@ -4,9 +4,11 @@ const http = require('http')
 const os = require('os')
 const path = require('path');
 const bodyParser = require('body-parser');
-const mysql = require('mysql');
+// const mysql = require('mysql');
+const mysql = require('promise-mysql');
 const SMSClient = require('@alicloud/sms-sdk');
 const schedule = require('node-schedule');
+const {promisify} = require('util');
 
 // setup Mysql
 var config = require('./db/config');
@@ -159,26 +161,28 @@ app.get('/fire/start', function (req, res, next) {
  * 绑定表单
  */
 app.get('/fire/bind', function (req, res, next) {
-  var code = req.query.code;
+  let code = req.query.code;
   if(!code)  return res.sendStatus(401);
+  let openid = null;
 	
-	oauthApi.getAccessToken(code, function (err, result) {
-    //console.log('getAccessToken', err, result);
-    if(err)  return next(err);
-    let openid = result.data.openid;
+  const getAccessTokenPro = promisify(oauthApi.getAccessToken).bind(oauthApi);
+  getAccessTokenPro(code).then( result => {
+    // console.log('getAccessToken', result);
+    openid = result.data.openid;
     if(!openid)  return res.status(401).send('微信id获取错误！');
     
     // 查询用户绑定
-    db.query(fireUsers.getUserByOpenid, [openid], function (err, users) {
-      //console.log('users:', err, users);
-			if(err) return next(err);
-      let bound = (users.length > 0);
-      let mobile = bound? users[0].mobile: '';
-      
-      res.render('bind', {bound, mobile, openid});
-    });
+    return db.query(fireUsers.getUserByOpenid, [openid]);
+  }).then( users => {
+    // console.log('users:', users);
+    let bound = (users.length > 0);
+    let mobile = bound? users[0].mobile: '';
     
-  });
+    res.render('bind', {bound, mobile, openid});
+  }).catch(err => {
+    console.error('/fire/bind err:', err);
+    return next(err);
+  });  
 });
 
 /**
