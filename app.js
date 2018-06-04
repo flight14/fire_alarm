@@ -89,6 +89,7 @@ var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
 }, function (token, callback) {
   let s_token = JSON.stringify(token);
   db.query(wechatTokens.upsert, ['access_token', s_token, s_token]).then(results => {
+    console.log('Updated Access_token', s_token);
     callback(null, results);
   }).catch(err => {
     callback(err);
@@ -136,6 +137,13 @@ var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
 })*/
 
 /**
+ * 定义 Promise.each() 方法
+ */
+Promise.each = async function(arr, fn) { // take an array and a function
+   for(const item of arr) await fn(item);
+}
+
+/**
  * 发送报警 
  */
 function sendAlarm(alarm, users) {
@@ -143,13 +151,19 @@ function sendAlarm(alarm, users) {
   let rectime = alarm.rtime.toLocaleString();
   console.error('SendAlarm r', rectime, 's', curtime, alarm.type, '----------------');
   
-  users.forEach( function(user) {
-    if(!user.openid)  return;
-    
-    wechatApi.sendTemplate(user.openid, alarm.templateId, 
-      alarm.url, alarm.data, function(err, result) {
-      console.log('Send', user.mobile, result);
-    })
+  const sendTemplatePro = promisify(wechatApi.sendTemplate).bind(wechatApi);
+  
+  Promise.each(users, user => {
+    if(!user.openid)  return Promise.resolve(null);
+    return sendTemplatePro(
+      user.openid, 
+      alarm.templateId, 
+      alarm.url, 
+      alarm.data).then(result => {
+        console.log('Send', user.mobile, result);
+      }).catch(err => {
+        console.log('Send', user.mobile, 'err', err);
+      });
   });
 }
 
