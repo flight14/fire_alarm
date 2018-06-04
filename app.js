@@ -14,6 +14,7 @@ const {promisify} = require('util');
 var config = require('./db/config');
 var fireUsers = require('./db/fire_users');
 var captchaSql = require('./db/captcha_sql');
+var wechatTokens = require('./db/wechat_tokens');
 var db = mysql.createPool(config.mysql);
 
 const app = express();
@@ -73,18 +74,37 @@ setInterval(function() {
 let wx = require('./wxconfig');
 let appId = wx.appId; 
 let appSecret = wx.appSecret;
-var WechatAPI = require('wechat-api')
-var fs = require('fs')
+var WechatAPI = require('wechat-api');
+var fs = require('fs');
+// Manage access_token by DB
 var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
-  fs.readFile('access_token.txt', 'utf8', function (err, txt) {
-    if (err) {return callback(null, null)} 
-    callback(null, JSON.parse(txt))
-  })
+  db.query(wechatTokens.getByName, ['access_token']).then(results => {
+    if(!results.length) {
+      return callback(null, null);
+    }
+    callback(null, JSON.parse(results[0].token));
+  }).catch(err => {
+    callback(err);
+  });
 }, function (token, callback) {
-  fs.writeFile('access_token.txt', JSON.stringify(token), callback)
+  let s_token = JSON.stringify(token);
+  db.query(wechatTokens.upsert, ['access_token', s_token, s_token]).then(results => {
+    callback(null, results);
+  }).catch(err => {
+    callback(err);
+  });
 });
+// Manage access_token by FS
+// var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
+  // fs.readFile('access_token.txt', 'utf8', function (err, txt) {
+    // if (err) {return callback(null, null)} 
+    // callback(null, JSON.parse(txt))
+  // })
+// }, function (token, callback) {
+  // fs.writeFile('access_token.txt', JSON.stringify(token), callback)
+// });
 
-var OAuth = require('wechat-oauth') 
+var OAuth = require('wechat-oauth');
 var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
 	  fs.readFile(__dirname+ '/token/'+ openid +'.token.txt', 'utf8', function (err, txt) {
 			if (err) {return callback(err)}
