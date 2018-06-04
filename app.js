@@ -94,17 +94,38 @@ var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
     callback(err);
   });
 });
-// Manage access_token by FS
-// var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
-  // fs.readFile('access_token.txt', 'utf8', function (err, txt) {
-    // if (err) {return callback(null, null)} 
-    // callback(null, JSON.parse(txt))
-  // })
-// }, function (token, callback) {
-  // fs.writeFile('access_token.txt', JSON.stringify(token), callback)
-// });
+/*// Manage access_token by FS 
+var wechatApi = new WechatAPI(appId, appSecret, function (callback) {
+  fs.readFile('access_token.txt', 'utf8', function (err, txt) {
+    if (err) {return callback(null, null)} 
+    callback(null, JSON.parse(txt))
+  })
+}, function (token, callback) {
+  fs.writeFile('access_token.txt', JSON.stringify(token), callback)
+}); */
 
 var OAuth = require('wechat-oauth');
+// Manage oauth_token by DB
+var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
+  let name = openid +'-token';
+  db.query(wechatTokens.getByName, [name]).then(results => {
+    if(!results.length) {
+      return callback(null, null);
+    }
+    callback(null, JSON.parse(results[0].token));
+  }).catch(err => {
+    callback(err);
+  });
+}, function (openid, token, callback) {
+  let name = openid +'-token';
+  let s_token = JSON.stringify(token);
+  db.query(wechatTokens.upsert, [name, s_token, s_token]).then(results => {
+    callback(null, results);
+  }).catch(err => {
+    callback(err);
+  });
+})
+/*// Manage oauth_token by FS
 var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
 	  fs.readFile(__dirname+ '/token/'+ openid +'.token.txt', 'utf8', function (err, txt) {
 			if (err) {return callback(err)}
@@ -112,7 +133,7 @@ var oauthApi = new OAuth(wx.appId, wx.appSecret, function (openid, callback) {
 	  })
 }, function (openid, token, callback) {
 	  fs.writeFile(__dirname+ '/token/'+ openid + '.token.txt', JSON.stringify(token), callback)
-})
+})*/
 
 /**
  * 发送报警 
